@@ -1,5 +1,5 @@
 # 2D_SLAM
-Project for the course in [Probabilistic Robotics](https://sites.google.com/diag.uniroma1.it/probabilistic-robotics-2021-22/home) at Sapienza University of Rome
+Project for the course in [Probabilistic Robotics](https://sites.google.com/diag.uniroma1.it/probabilistic-robotics-2021-22/home) at Sapienza University of Rome\
 \
 <a href="https://www.dis.uniroma1.it/"><img src="http://www.dis.uniroma1.it/sites/default/files/marchio%20logo%20eng%20jpg.jpg" width="500"></a>
 
