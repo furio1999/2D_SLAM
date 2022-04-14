@@ -142,7 +142,7 @@ dataset='Datasets';
 guess_algo='naive'; % to be defined
 plots_path='plots';
 % XR=0;
-% Map plot: Lanmarks IG, OPT, GT
+% Map plot: Landmarks IG, OPT, GT
 plot_map(XL_guess, XL, XL_true, plots_path, guess_algo, dataset);
 pause
 
