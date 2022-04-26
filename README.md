@@ -10,7 +10,7 @@ But this naive approach leads to the common phenomenon of "dead recking", which 
 In this work we will show how to handle this scenario using a Least Square Approach to optimize the trajectory, closing the trajectory loop.
 
 ## Material
-- Dataset (in .g2o format) composed of : 2D range measurements, landmarks positions (only ground-truth), edge transitions (unused), Robot Poses
+- Dataset (in .g2o format) composed of : 2D range measurements, landmarks positions (only ground-truth), edge transitions, Robot Poses
 - Wheeled Mobile Robot to provide the data
 
 ## Approach
