@@ -8,12 +8,13 @@ source "functions/odometry.m"
 source "functions/get_initial_guess.m"
 source "functions/initial_guess_matching.m"
 source "functions/get_obs_ass.m"
+source "functions/build_obs.m"
 addpath("functions")
 addpath("tools/g2o_wrapper")
 addpath("Datasets")
-addpath("ICP")
-#source "ICP/MultiICP.m"
-source "ICP/multi_ICP_2d.m"
+addpath("LS")
+source "LS/Optimization_2d.m"
+source "LS/Optimization_2d_edges.m"
 source "tools/visualization/plotter.m"
 
 # h = figure(1); #attenzione
@@ -42,31 +43,70 @@ for l=1:length(landmarks_ground_truth)
 	available_landmarks(l) = landmarks_ground_truth(l).id;
 endfor
 
-%% get an INITIAL GUESS of the landmarks given their id, poses and obs from init_guess_dataset
-% FIELDS: 
-% 	landmarks(i).id
-% 	landmarks(i).landmark_position(1) and landmarks(i).landmark_position(2)
-landmarks = get_initial_guess(available_landmarks, poses, observations);
+%% ------------------------------------ %%
+%% ----------CALIBRATION INIT-----------%%
+%% ------------------------------------ %%
 
-%% ------------------------------------ %%
-%% ----------- ICP INIT --------------- %%
-%% ------------------------------------ %%
+dataset='Datasets';
+guess_algo='latemax'; 
+plots_path='plots';
+
+variance_threshold = 0.6; 
+max_range_obs = 6; 
+l_noise = 9e-3; % Noise parameter for lateration algorithm 
 
 global num_poses = length(poses);
-global num_landmarks = length(landmarks);
+global num_lms=length(available_landmarks)
+global num_trs=length(transitions)
+global obs_num=length(observations_ground_truth)
+
+data="edges"; #(write "poses" or "edges")
+tf_vec = [-0.2 -1.8 0.22]; % Transformation vector for a better visualization of the result (simulated calibration)
+
+% do this to calibrate the odometry. With these data, you have coincident actual and ground truth transitions, so it cannot be done
+% we cannot use the same measurements derived from pose-pose displacements of this dataset, we have to retrieve them separately
+%{
+edges=transitions;
+trajectory_edges=build_obs(edges, transitions_ground_truth, num_trs);
+Sensor_bias=ls_calibrate_odometry(trajectory_edges);
+tf_vec2=t2v(Sensor_bias)
+pause
+%}
 
 %% ----------------STEP 1------------------- %%
 %%--------BUILD XR_GUESS and XR_true-------- %%
 
+% the graph edges are the pose-pose relative displacements of the robot X^i_{i-1}, with X=(x,y,θ)
+% encapsulated in the variable transitions
+
 XR_guess = zeros(3, 3, num_poses);
 XR_true = zeros(3, 3, num_poses);
 
-XR_true=compute_odometry_trajectory(poses_ground_truth);
-XR_guess=compute_odometry_trajectory(poses);
+%% Case 1: odometry without graph edges
+
+if data=="poses"
+  XR_true=compute_odometry_trajectory(poses_ground_truth);
+  XR_guess=compute_odometry_trajectory(poses);
+end
+
+%% case 2: odometry using graph edges
+
+if data=="edges"
+   XR_true=compute_odometry_trajectory(poses_ground_truth);
+   [XR_guess,poses_xy]=poses_odom_SE2(poses, transitions, num_poses, num_trs);
+end
+
+
 
 %% ----------------STEP 2------------------- %%
 %%--------BUILD XL_GUESS and XL_true-------- %%
 
+% get an INITIAL GUESS of the landmarks given their id, poses and obs from init_guess_dataset
+[landmarks, obs_new] = get_initial_guess(available_landmarks, poses, observations, 
+                                         guess_algo, l_noise, max_range_obs, variance_threshold);
+
+global num_landmarks = length(landmarks);
+% xy position of landmarks
 XL_guess = zeros(2,num_landmarks);
 XL_true = zeros(2,num_landmarks);
 
@@ -82,21 +122,30 @@ fflush(stdout);
 %% ----------------STEP 3------------------- %%
 %%-----------GET THE OBSERVATIONS----------- %%
 
-[Z,associations]=get_obs_ass(observations);
+[Z,associations]=get_obs_ass(observations); %careful
 
 %
 
 %%-----------------------------------------%%
-%%-------------ICP OPTIMIZATION------------%%
+%%-------------OPTIMIZATION----------------%%
 %%-----------------------------------------%%
 
-printf("\n\n%% ------------------------------------ %%\n%% ------ Starting ICP optimization --- %%\n%% ------------------------------------ %%\n\n");
+printf("\n\n%% ------------------------------------ %%\n%% ------ Starting Least Squares ------ %%\n%% ------------------------------------ %%\n\n");
 fflush(stdout);
 
+% test for the calibration part
+%{
+for i=1:num_poses
+        XR_guess2(:,:,i) = v2t(tf_vec2) * XR_guess(:,:,i);
+        XR_guess(:,:,i) = v2t(tf_vec) * XR_guess(:,:,i);		
+endfor
+%}
+
+%
 num_iterations = 10;
 damping = 0.01;
 kernel_threshold = 1.0;
-[XR, XL, chi_stats, num_inliers]=doMultiICP(XR_guess, XL_guess, Z, 
+[XR, XL, chi_stats, num_inliers]=doLeastSquares(XR_guess, XL_guess, Z, 
 							associations, 
 							num_poses, 
 							num_landmarks, 
@@ -104,7 +153,7 @@ kernel_threshold = 1.0;
 							damping=0.15, 
 							kernel_threshold=0.2);
 
-printf("\n\n%% ------------------------------------ %%\n%% ------- ICP optimization DONE ------ %%\n%% ------------------------------------ %%\n\n");
+printf("\n\n%% ------------------------------------ %%\n%% ------- Optimization DONE --------- %%\n%% ------------------------------------ %%\n\n");
 fflush(stdout);
 pause(1);
 
@@ -114,11 +163,44 @@ fflush(stdout);
 printf("\nAt guess stage %i were verified landmarks\nAt correction stage %i are verified landmarks\n",[eval_guess,eval_correction]);
 fflush(stdout);
 
-%
+%{
 
 %%-----------------------------------------%%
 %%---------------TRAJECTORY----------------%%
 %%-----------------------------------------%%
+
+% test for calibrated odometry
+figure();
+%
+hold on;
+title("Robot trajectory");
+
+r = 1;
+c = num_poses;
+    
+plot(reshape(XR_guess(1,3,:), r, c), reshape(XR_guess(2,3,:), r, c), 'g-', 'linewidth', 3);
+plot(reshape(XR_guess2(1,3,:), r, c), reshape(XR_guess2(2,3,:), r, c), 'r-', 'linewidth', 3);
+plot(reshape(XR_true(1,3,:), r, c), reshape(XR_true(2,3,:), r, c), 'k-', 'linewidth', 3);
+legend("initial guess", "initial guess 2", "ground truth");
+legend("initial guess", "ground truth");
+pause
+
+%}
+
+
+% XR=0;
+% Map plot: Landmarks IG, OPT, GT
+plot_map(XL_guess, XL, XL_true, plots_path, guess_algo, dataset);
+pause
+
+% Trajectory plot: Poses IG, OPT, GT
+plot_traj(XR_guess, XR, XR_true, num_poses, plots_path, guess_algo, dataset);
+pause
+
+% Trajectory plot w/ simulated odometry calibration: Poses IG, OPT, GT
+plot_cal_traj(XR_guess, XR, XR_true, num_poses, tf_vec, plots_path, guess_algo, dataset);
+pause
+%
 
 %{
 figure()
@@ -136,21 +218,3 @@ plot(XR(1,3,:),XR(2,3,:), 'b-', 'linewidth', 3);
 legend("ground truth","guess","correction");
 pause
 %}
-
-poses_num=length(poses);
-dataset='Datasets';
-guess_algo='naive'; % to be defined
-plots_path='plots';
-% XR=0;
-% Map plot: Landmarks IG, OPT, GT
-plot_map(XL_guess, XL, XL_true, plots_path, guess_algo, dataset);
-pause
-
-% Trajectory plot: Poses IG, OPT, GT
-plot_traj(XR_guess, XR, XR_true, poses_num, plots_path, guess_algo, dataset);
-pause
-
-tf_vec = [-0.2 -1.8 0.22]; % Transformation vector for a better visualization of the result (simulated calibration)
-% Trajectory plot w/ simulated odometry calibration: Poses IG, OPT, GT
-plot_cal_traj(XR_guess, XR, XR_true, poses_num, tf_vec, plots_path, guess_algo, dataset);
-pause

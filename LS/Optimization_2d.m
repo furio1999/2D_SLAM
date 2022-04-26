@@ -4,17 +4,6 @@ source "tools/utilities/geometry_helpers_2d.m"
 global pose_dim=3;
 global landmark_dim=2;
 
-
-# retrieves the index in the perturbation vector, that corresponds to
-# a certain pose
-# input:
-#   pose_index:     the index of the pose for which we want to compute the
-#                   index
-#   num_poses:      number of pose variables in the state
-#   num_landmarks:  number of pose variables in the state
-# output:
-#   v_idx: the index of the sub-vector corrsponding to 
-#          pose_index, in the array of perturbations  (-1 if error)
 function v_idx=poseMatrixIndex(pose_index, num_poses, num_landmarks)
   global pose_dim;
   global landmark_dim;
@@ -27,16 +16,7 @@ function v_idx=poseMatrixIndex(pose_index, num_poses, num_landmarks)
 endfunction;
 
 
-# retrieves the index in the perturbation vector, that corresponds to
-# a certain landmark
-# input:
-#   landmark_index:     the index of the landmark for which we want to compute the
-#                   index
-#   num_poses:      number of pose variables in the state
-#   num_landmarks:  number of pose variables in the state
-# output:
-#   v_idx: the index of the perturnation corrsponding to the
-#           landmark_index, in the array of perturbations
+
 function v_idx=landmarkMatrixIndex(landmark_index, num_poses, num_landmarks)
   global pose_dim;
   global landmark_dim;
@@ -46,6 +26,26 @@ function v_idx=landmarkMatrixIndex(landmark_index, num_poses, num_landmarks)
   endif;
   v_idx=1 + (num_poses)*pose_dim + (landmark_index-1) * landmark_dim;
 endfunction;
+
+% Retrieves indices of poses/landmarks in the Hessian matrix
+function [p_matrix_idx, l_matrix_idx] = matrix_index(p_index, lm_index, num_poses, lms_num)
+    global pose_dim;
+    global lm_dim;
+    
+    if p_index > num_poses || p_index <= 0
+        p_matrix_idx = -1;
+    else
+        p_matrix_idx = 1 + (p_index-1)*pose_dim;
+    endif
+
+
+    if lm_index > lms_num || lm_index <= 0
+        l_matrix_idx = -1;
+    else
+        l_matrix_idx = 1 + (num_poses)*pose_dim + (lm_index-1)*lm_dim;
+    endif
+    
+end
 
 # error and jacobian of a measured landmark
 # input:
@@ -120,19 +120,23 @@ endfunction;
 # output:
 #   XR: the robot poses obtained by applying the perturbation
 #   XL: the landmarks obtained by applying the perturbation
+
 function [XR, XL]=boxPlus(XR, XL, num_poses, num_landmarks, dx)
   global pose_dim;
   global landmark_dim;
+
   for(pose_index=1:num_poses)
     pose_matrix_index=poseMatrixIndex(pose_index, num_poses, num_landmarks);
     dxr=dx(pose_matrix_index:pose_matrix_index+pose_dim-1);
     XR(:,:,pose_index)=v2t(dxr)*XR(:,:,pose_index);
   endfor;
+
   for(landmark_index=1:num_landmarks)
     landmark_matrix_index=landmarkMatrixIndex(landmark_index, num_poses, num_landmarks);
     dxl=dx(landmark_matrix_index:landmark_matrix_index+landmark_dim-1,:);
     XL(:,landmark_index)+=dxl(1:2); % edit (1:2)
   endfor;
+  
 endfunction;
 
 # implementation of the optimization loop with robust kernel
@@ -156,7 +160,8 @@ endfunction;
 #   XL: the landmarks after optimization
 #   chi_stats: array 1:num_iterations, containing evolution of chi2
 #   num_inliers: array 1:num_iterations, containing evolution of inliers
-function [XR, XL, chi_stats, num_inliers]=doMultiICP(XR, XL, Z, 
+
+function [XR, XL, chi_stats, num_inliers]=doLeastSquares(XR, XL, Z, 
 							associations, 
 							num_poses, 
 							num_landmarks, 
