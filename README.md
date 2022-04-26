@@ -14,6 +14,13 @@ In this work we will show how to handle this scenario using a Least Square Appro
 - Wheeled Mobile Robot to provide the data
 
 ## Approach
+choose whether to use absolute positions or pose-pose relative displacements
+```
+# in main.m
+case="poses" # absolute poses
+case="edges" # transition measurements
+```
+
 Launch the main file
 ```
 octave main.m
