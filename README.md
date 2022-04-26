@@ -37,6 +37,6 @@ As we see, it's better to apply a lest squares approach to generate a more accur
 In the next paragraph, we show more clearly the difference between the optimized and naive trajectories.
 ### Trajectories with Calibrated Odometry
 From the previous graph, it seems that the computed optimized trajectory follows the ground-truth, except for a rototranslation.
-Given the hypothesis of calibrated odometry, I provide a tranformation vector to map the computed trajecories into their original pose.
+Given the hypothesis of calibrated odometry, I provide a transformation vector to map the computed trajecories into their original pose.
 ![Datasets_naive_cal_traj_plot](https://user-images.githubusercontent.com/63920397/163470520-119055b9-f461-4d72-b3a4-c034b566e139.png)
 
