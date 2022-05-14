@@ -30,3 +30,8 @@ function J = J_atan2(p)
   n2=p'*p;
   J= 1./n2 * [-p(2) p(1)];
 endfunction
+
+function mat=skew(t)
+mat=[0 -t(1) 0;
+     ]
+endfunction

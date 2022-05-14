@@ -14,8 +14,10 @@ addpath("tools/g2o_wrapper")
 addpath("Datasets")
 addpath("LS")
 source "LS/Optimization_2d.m"
+source "LS/Optimization_2d_odometry.m"
 source "LS/Optimization_2d_edges.m"
 source "tools/visualization/plotter.m"
+source "tools/utilities/preprocessTransitions.m"
 
 # h = figure(1); #attenzione
 
@@ -60,7 +62,8 @@ global num_lms=length(available_landmarks)
 global num_trs=length(transitions)
 global obs_num=length(observations_ground_truth)
 
-data="edges"; #(write "poses" or "edges")
+data="poses"; #(write "poses" or "edges")
+method="edges";
 tf_vec = [-0.2 -1.8 0.22]; % Transformation vector for a better visualization of the result (simulated calibration)
 
 % do this to calibrate the odometry. With these data, you have coincident actual and ground truth transitions, so it cannot be done
@@ -73,6 +76,7 @@ tf_vec2=t2v(Sensor_bias)
 pause
 %}
 
+%
 %% ----------------STEP 1------------------- %%
 %%--------BUILD XR_GUESS and XR_true-------- %%
 
@@ -97,7 +101,6 @@ if data=="edges"
 end
 
 
-
 %% ----------------STEP 2------------------- %%
 %%--------BUILD XL_GUESS and XL_true-------- %%
 
@@ -109,7 +112,6 @@ global num_landmarks = length(landmarks);
 % xy position of landmarks
 XL_guess = zeros(2,num_landmarks);
 XL_true = zeros(2,num_landmarks);
-
 for l=1:num_landmarks
 	XL_guess(1:2,l) = landmarks(l).landmark_position;
 	XL_true(1:2,l) = [landmarks_ground_truth(l).x_pose; landmarks_ground_truth(l).y_pose];
@@ -145,6 +147,24 @@ endfor
 num_iterations = 10;
 damping = 0.01;
 kernel_threshold = 1.0;
+
+## save and load variables ##
+save("Datasets/variables", "XR_guess", "XL_guess", "XL_true", "XR_true", "Z", "associations", "eval_guess");
+%{
+S=load("Datasets/variables");
+XR_guess=S.XR_guess;
+XR_true=S.XR_true;
+XL_guess=S.XL_guess;
+XL_true=S.XL_true;
+global num_landmarks=size(XL_guess, 2)
+Z=S.Z;
+associations=S.associations;
+eval_guess=S.eval_guess;
+%}
+
+method
+if method=="poses" 
+disp("poses");
 [XR, XL, chi_stats, num_inliers]=doLeastSquares(XR_guess, XL_guess, Z, 
 							associations, 
 							num_poses, 
@@ -152,6 +172,19 @@ kernel_threshold = 1.0;
 							num_iterations=10, 
 							damping=0.15, 
 							kernel_threshold=0.2);
+end
+
+if method=="edges"
+T=preprocessTransitions(transitions, poses);
+[XR, XL, chi_stats, num_inliers, e_record]=doLeastSquaresEdges(XR_guess, XL_guess, T, poses, Z, 
+							associations, 
+							num_trs,
+							num_poses, 
+							num_landmarks, 
+							num_iterations=10, 
+							damping=0.15, 
+							kernel_threshold=0.2);
+end
 
 printf("\n\n%% ------------------------------------ %%\n%% ------- Optimization DONE --------- %%\n%% ------------------------------------ %%\n\n");
 fflush(stdout);
@@ -159,17 +192,19 @@ pause(1);
 
 % Now we evaluate the correction in the same way as for the initial guess
 eval_correction = initial_guess_matching(XL_true,XL);
+save("Datasets/solution", "eval_correction", "XR", "XL", "chi_stats", "num_inliers", "e_record");
 fflush(stdout);
 printf("\nAt guess stage %i were verified landmarks\nAt correction stage %i are verified landmarks\n",[eval_guess,eval_correction]);
 fflush(stdout);
 
-%{
+%
 
 %%-----------------------------------------%%
 %%---------------TRAJECTORY----------------%%
 %%-----------------------------------------%%
 
 % test for calibrated odometry
+%{
 figure();
 %
 hold on;
@@ -187,6 +222,14 @@ pause
 
 %}
 
+% check error history over iterations and transitions
+%{
+figure()
+plot(e_record(1,:), 'r-', 'linewidth', 3);
+pause
+plot(e_record(end,:), 'r-', 'linewidth', 3);
+pause
+%}
 
 % XR=0;
 % Map plot: Landmarks IG, OPT, GT
