@@ -46,5 +46,7 @@ Given the hypothesis of calibrated odometry, I provide a transformation vector t
 ## Range and Odometry
 Here I show the results using odometry measurements too
 ### Landmark Map
+![Datasets_latemax_map_plot](https://user-images.githubusercontent.com/63920397/168425780-f8ed3bba-eadc-4753-8ae1-62e36c438c1d.png)
 
 ### Trajectories
+![Datasets_latemax_traj_plot](https://user-images.githubusercontent.com/63920397/168425798-3ea61b47-65f0-42b0-85d8-fc21c7290054.png)
