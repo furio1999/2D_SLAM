@@ -17,14 +17,17 @@ In this work we will show how to handle this scenario using a Least Square Appro
 choose whether to use absolute positions or pose-pose relative displacements
 ```
 # in main.m
-case="poses" # absolute poses
-case="edges" # transition measurements
+data="poses" # compute initial trajectory using absolute poses
+data="edges" # compute initial trajectory using transition measurements
+method="poses" # Do Least Squares on range measurements only
+method="edges" # Do least Squares using both range and odometry measurements
 ```
 
 Launch the main file
 ```
 octave main.m
 ```
+## Range-Only
 ### Landmark Map
 Firstly, we generate a map of the real and estimated landmark positions
 ![Datasets_naive_map_plot](https://user-images.githubusercontent.com/63920397/163470460-0323ed6d-b63f-46ba-b879-2e283c8630ff.png)
@@ -40,3 +43,8 @@ From the previous graph, it seems that the computed optimized trajectory follows
 Given the hypothesis of calibrated odometry, I provide a transformation vector to map the computed trajecories into their original pose.
 ![Datasets_naive_cal_traj_plot](https://user-images.githubusercontent.com/63920397/163470520-119055b9-f461-4d72-b3a4-c034b566e139.png)
 
+## Range and Odometry
+Here I show the results using odometry measurements too
+### Landmark Map
+
+### Trajectories
